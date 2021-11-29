@@ -1,0 +1,72 @@
+// Plot Landsat 8 band value means in a section of San Francisco and
+// demonstrate interactive charts.
+
+// var sanFrancisco =
+//     ee.Geometry.Rectangle(-122.45, 37.74, -122.4, 37.8);
+// var Dec_whisoutCloud= sentinel5.filterDate('2021-01-01', '2021-01-31')
+                  // .filterBounds(thies)
+
+          ///     .filterMetadata('CLOUD_COVERAGE_ASSESSMENT','equals',90)
+                 
+  // print (Dec_whisoutCloud)   
+
+var imtest =ee.ImageCollection(['COPERNICUS/S5P/NRTI/L3_SO2/20210401T143109_20210401T152316']).mosaic().clipToCollection(thies)
+var sentinel5 = ee.ImageCollection('COPERNICUS/S5P/NRTI/L3_SO2')
+    .filterDate('2019-01-01', '2019-03-31')
+    //.select('B[1-7]');
+    
+    
+    var trueColor432 = imtest.select(['SO2_column_number_density']);
+
+var trueColor432Vis = {
+  min: 0.0,
+  max: 0.0005,
+  palette: ['black', 'blue', 'purple', 'cyan', 'green', 'yellow', 'red']
+};
+Map.setCenter(-13.09, 13.04, 9);
+Map.addLayer(trueColor432, trueColor432Vis, 'True Color (432)');
+
+
+// Create an image time series chart.
+var chart = ui.Chart.image.series({
+  imageCollection: sentinel5,
+  region: thies,
+  reducer: ee.Reducer.mean(),
+  scale: 200
+});
+
+// Add the chart to the map.
+chart.style().set({
+  position: 'bottom-right',
+  width: '500px',
+  height: '300px'
+});
+Map.add(chart);
+
+// Outline and center San Francisco on the map.
+var sfLayer = ui.Map.Layer(thies, {color: 'FF0000'}, 'SF');
+Map.layers().add(sfLayer);
+Map.setCenter(-122.47, 37.7, 9);
+
+// Create a label on the map.
+var label = ui.Label('Click a point on the chart to show the image for that date.');
+Map.add(label);
+
+// When the chart is clicked, update the map and label.
+chart.onClick(function(xValue, yValue, seriesName) {
+  if (!xValue) return;  // Selection was cleared.
+
+  // Show the image for the clicked date.
+  var equalDate = ee.Filter.equals('system:time_start', xValue);
+  var image = ee.Image(sentinel5.filter(equalDate).first());
+  var l8Layer = ui.Map.Layer(image, {
+    gamma: 1.3,
+    min: 0,
+    max: 0.3,
+    bands: ['SO2_column_number_density']
+  });
+  Map.layers().reset([l8Layer, sfLayer]);
+
+  // Show a label with the date on the map.
+  label.setValue((new Date(xValue)).toUTCString());
+});
